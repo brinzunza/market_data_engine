@@ -1,4 +1,4 @@
-# Synthetic Market Data API - Python Implementation
+# Synthetic Market Data API
 
 A production-ready real-time synthetic stock market data API using **Geometric Brownian Motion (GBM)** for price simulation. Built with **FastAPI** and **Python 3.11+**. Features both REST endpoints for historical data and WebSocket streaming for real-time market feeds.
 
@@ -20,12 +20,10 @@ A production-ready real-time synthetic stock market data API using **Geometric B
 - Docker and Docker Compose
 - Python 3.11+ (for local development)
 
-### Run with Docker Compose (Recommended)
-
 1. Clone the repository:
 ```bash
 git clone <your-repo>
-cd synthDataAPI
+cd market_data_engine
 ```
 
 2. Copy environment variables:
@@ -233,8 +231,6 @@ Edit `python_src/services/data_generator.py` and add to `TICKER_CONFIGS`:
 ```
 
 Then add to `.env`:
-```
-TICKERS=SYNTH,TECH,FINANCE,ENERGY,HEALTH,NEWTICKER
 ```
 
 ### Database Access
