@@ -73,7 +73,7 @@ async def root():
                 "description": "Real-time market data streaming"
             }
         },
-        "documentation": "https://github.com/yourusername/synthetic-market-api"
+        "documentation": "https://github.com/brinzunza/market_data_engine"
     }
 
 

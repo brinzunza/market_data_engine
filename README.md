@@ -1,6 +1,10 @@
+<div style="margin-bottom: 20px;">
+  <img src="phanes.jpg" alt="phanes" width="100%" style="display: block;"/>
+</div>
+
 # Synthetic Market Data API
 
-A production-ready real-time synthetic stock market data API using **Geometric Brownian Motion (GBM)** for price simulation. Built with **FastAPI** and **Python 3.11+**. Features both REST endpoints for historical data and WebSocket streaming for real-time market feeds.
+A real-time synthetic stock market data generator and API.
 
 
 ## Features
@@ -22,7 +26,7 @@ A production-ready real-time synthetic stock market data API using **Geometric B
 
 1. Clone the repository:
 ```bash
-git clone <your-repo>
+git clone 
 cd market_data_engine
 ```
 
@@ -33,7 +37,7 @@ cp .env.example .env
 
 3. Start all services:
 ```bash
-docker-compose -f docker-compose.python.yml up -d
+docker-compose up -d
 ```
 
 This will start:
@@ -45,17 +49,17 @@ This will start:
 
 3. Initialize database:
 ```bash
-python -m python_src.db.init
+python3 -m python_src.db.init
 ```
 
 4. Start services in separate terminals:
 
 ```bash
 # Terminal 1: Data Generator
-python -m python_src.services.data_generator
+python3 -m python_src.services.data_generator
 
 # Terminal 2: Data Processor
-python -m python_src.services.data_processor
+python3 -m python_src.services.data_processor
 
 # Terminal 3: API Server
 uvicorn python_src.main:app --host 0.0.0.0 --port 3000 --reload

@@ -188,7 +188,7 @@ TECH    | Tech Innovations  | Technology  | 320.00
 time                | ticker | price  | volume | bid    | ask
 --------------------|--------|--------|--------|--------|-------
 2025-10-02 14:30:01 | SYNTH  | 150.25 | 12000  | 150.20 | 150.30
-2025-10-02 14:30:01 | TECH   | 321.50 | 18000  | 321.45 | 321.55
+2025-10-02 14:30:01 | TECH   | 321.50 | 13000  | 321.45 | 321.55
 ```
 
 **Table: `market_bars`** (aggregated OHLCV data)
@@ -209,7 +209,7 @@ time                | ticker | timeframe | open   | high   | low    | close  | v
 
 **How it works:**
 - Built with **FastAPI** (modern Python web framework)
-- Listens on port 8000 by default
+- Listens on port 3000 by default
 - Provides REST API endpoints
 - Manages WebSocket connections
 - Includes security features (rate limiting, CORS)
@@ -302,7 +302,7 @@ Gets statistical analysis:
 
 **How it works:**
 
-1. **Client connects** to `ws://localhost:8000/ws`
+1. **Client connects** to `ws://localhost:3000/ws`
 2. **Server assigns** a unique ID and sends welcome message
 3. **Client subscribes** to tickers they want to watch
 4. **Server streams** tick data as it arrives from Kafka
@@ -702,7 +702,7 @@ Response:
 import websockets
 import json
 
-async with websockets.connect('ws://localhost:8000/ws') as websocket:
+async with websockets.connect('ws://localhost:3000/ws') as websocket:
     # Server sends welcome
     welcome = await websocket.recv()
     # {
@@ -806,26 +806,26 @@ pong = await websocket.recv()
    ```bash
    python -m python_src.main
    # or
-   uvicorn python_src.main:app --reload --port 8000
+   uvicorn python_src.main:app --reload --port 3000
    ```
-   API available at http://localhost:8000
-   Swagger docs at http://localhost:8000/docs
+   API available at http://localhost:3000
+   Swagger docs at http://localhost:3000/docs
 
 ### Testing the API
 
 #### Using cURL
 ```bash
 # Get all tickers
-curl http://localhost:8000/api/v1/tickers
+curl http://localhost:3000/api/v1/tickers
 
 # Get latest quote
-curl http://localhost:8000/api/v1/quote/SYNTH
+curl http://localhost:3000/api/v1/quote/SYNTH
 
 # Get 1-minute bars
-curl "http://localhost:8000/api/v1/bars/SYNTH?timeframe=1m&limit=10"
+curl "http://localhost:3000/api/v1/bars/SYNTH?timeframe=1m&limit=10"
 
 # Get statistics
-curl "http://localhost:8000/api/v1/stats/SYNTH?period=1h"
+curl "http://localhost:3000/api/v1/stats/SYNTH?period=1h"
 ```
 
 #### Using Python (REST API)
@@ -833,18 +833,18 @@ curl "http://localhost:8000/api/v1/stats/SYNTH?period=1h"
 import requests
 
 # Fetch tickers
-response = requests.get('http://localhost:8000/api/v1/tickers')
+response = requests.get('http://localhost:3000/api/v1/tickers')
 data = response.json()
 print(data)
 
 # Get latest quote
-quote = requests.get('http://localhost:8000/api/v1/quote/SYNTH')
+quote = requests.get('http://localhost:3000/api/v1/quote/SYNTH')
 quote_data = quote.json()
 print(quote_data['data'])
 
 # Get historical bars for charting
 bars = requests.get(
-    'http://localhost:8000/api/v1/bars/SYNTH?timeframe=5m&limit=100'
+    'http://localhost:3000/api/v1/bars/SYNTH?timeframe=5m&limit=100'
 )
 bar_data = bars.json()
 # Use bar_data['data'] to create a candlestick chart
@@ -857,7 +857,7 @@ import websockets
 import json
 
 async def connect():
-    async with websockets.connect('ws://localhost:8000/ws') as websocket:
+    async with websockets.connect('ws://localhost:3000/ws') as websocket:
         print('Connected to market data feed')
 
         # Subscribe to tickers
@@ -900,7 +900,7 @@ docker-compose down -v
 
 ```bash
 # Server
-PORT=8000                    # API server port
+PORT=3000                    # API server port
 ENVIRONMENT=development      # development or production
 API_VERSION=v1              # API version prefix
 
@@ -949,7 +949,7 @@ Use the API to test buy/sell strategies without risking real money:
 import requests
 
 # Backtest a simple moving average strategy
-bars = requests.get('http://localhost:8000/api/v1/bars/SYNTH?timeframe=1h&limit=100')
+bars = requests.get('http://localhost:3000/api/v1/bars/SYNTH?timeframe=1h&limit=100')
 data = bars.json()
 
 # Calculate 20-period moving average
