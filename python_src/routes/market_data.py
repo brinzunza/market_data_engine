@@ -122,7 +122,7 @@ async def get_bars(
     end: Optional[str] = None,
     limit: int = Query(default=500, le=5000)
 ):
-    """Get OHLCV bars"""
+    """Get OHLCV bars using aggregation"""
     try:
         start_time = datetime.fromisoformat(start) if start else datetime.now() - timedelta(days=1)
         end_time = datetime.fromisoformat(end) if end else datetime.now()
@@ -138,24 +138,37 @@ async def get_bars(
         conn = db_pool.get_connection()
         cursor = conn.cursor()
 
+        # Use standard PostgreSQL date_trunc for time bucketing
+        # Use subqueries with ROW_NUMBER() for first/last values
         cursor.execute(
-            """SELECT
-                 time_bucket(%s::interval, time) AS time,
+            """WITH bucketed_data AS (
+                 SELECT
+                   date_trunc(%s, time) AS bucket_time,
+                   ticker,
+                   price,
+                   volume,
+                   time,
+                   ROW_NUMBER() OVER (PARTITION BY date_trunc(%s, time) ORDER BY time ASC) as rn_first,
+                   ROW_NUMBER() OVER (PARTITION BY date_trunc(%s, time) ORDER BY time DESC) as rn_last
+                 FROM market_ticks
+                 WHERE ticker = %s
+                   AND time >= %s
+                   AND time <= %s
+               )
+               SELECT
+                 bucket_time AS time,
                  ticker,
                  %s as timeframe,
-                 FIRST(price, time) as open,
+                 MAX(CASE WHEN rn_first = 1 THEN price END) as open,
                  MAX(price) as high,
                  MIN(price) as low,
-                 LAST(price, time) as close,
+                 MAX(CASE WHEN rn_last = 1 THEN price END) as close,
                  SUM(volume)::BIGINT as volume
-               FROM market_ticks
-               WHERE ticker = %s
-                 AND time >= %s
-                 AND time <= %s
-               GROUP BY time_bucket(%s::interval, time), ticker
-               ORDER BY time ASC
+               FROM bucketed_data
+               GROUP BY bucket_time, ticker
+               ORDER BY bucket_time ASC
                LIMIT %s""",
-            (interval, timeframe, ticker.upper(), start_time, end_time, interval, limit)
+            (interval, interval, interval, ticker.upper(), start_time, end_time, timeframe, limit)
         )
 
         columns = [desc[0] for desc in cursor.description]
@@ -200,14 +213,19 @@ async def get_stats(
         conn = db_pool.get_connection()
         cursor = conn.cursor()
 
+        # Use subqueries to get first and last prices by time
         cursor.execute(
             """SELECT
                  ticker,
                  COUNT(*) as tick_count,
                  MIN(price) as low,
                  MAX(price) as high,
-                 FIRST(price, time) as open,
-                 LAST(price, time) as close,
+                 (SELECT price FROM market_ticks
+                  WHERE ticker = %s AND time >= NOW() - %s::interval
+                  ORDER BY time ASC LIMIT 1) as open,
+                 (SELECT price FROM market_ticks
+                  WHERE ticker = %s AND time >= NOW() - %s::interval
+                  ORDER BY time DESC LIMIT 1) as close,
                  AVG(price) as avg_price,
                  SUM(volume)::BIGINT as total_volume,
                  STDDEV(price) as volatility
@@ -215,7 +233,7 @@ async def get_stats(
                WHERE ticker = %s
                  AND time >= NOW() - %s::interval
                GROUP BY ticker""",
-            (ticker.upper(), interval)
+            (ticker.upper(), interval, ticker.upper(), interval, ticker.upper(), interval)
         )
 
         columns = [desc[0] for desc in cursor.description]

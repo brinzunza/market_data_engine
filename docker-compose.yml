@@ -1,10 +1,10 @@
 version: '3.8'
 
 services:
-  # TimescaleDB (PostgreSQL with time-series extension)
-  timescaledb:
-    image: timescale/timescaledb:latest-pg15
-    container_name: synthetic-timescaledb
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: synthetic-postgres
     environment:
       POSTGRES_DB: synthetic_market
       POSTGRES_USER: postgres
@@ -12,7 +12,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - timescale_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -74,12 +74,12 @@ services:
       dockerfile: Dockerfile.python
     container_name: synthetic-processor
     depends_on:
-      timescaledb:
+      postgres:
         condition: service_healthy
       kafka:
         condition: service_healthy
     environment:
-      DB_HOST: timescaledb
+      DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: synthetic_market
       DB_USER: postgres
@@ -95,7 +95,7 @@ services:
       dockerfile: Dockerfile.python
     container_name: synthetic-api
     depends_on:
-      timescaledb:
+      postgres:
         condition: service_healthy
       kafka:
         condition: service_healthy
@@ -104,7 +104,7 @@ services:
     environment:
       PORT: 3000
       HOST: 0.0.0.0
-      DB_HOST: timescaledb
+      DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: synthetic_market
       DB_USER: postgres
@@ -114,4 +114,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  timescale_data:
+  postgres_data:
