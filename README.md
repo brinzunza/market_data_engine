@@ -16,6 +16,7 @@ A real-time synthetic stock market data generator and API.
 - **OHLCV Bars**: Aggregated candlestick data for multiple timeframes (1m, 5m, 1h, 1d)
 - **TimescaleDB**: Optimized time-series database with automatic data retention
 - **Production Ready**: Docker Compose for easy deployment, async I/O, and structured logging
+- **Rate Limiting**: Includes proper rate limiting to prevent request floods. 
 
 ## Quick Start
 

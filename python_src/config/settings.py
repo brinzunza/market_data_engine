@@ -37,8 +37,9 @@ class Settings:
     TICKERS = os.getenv("TICKERS", "SYNTH,TECH,FINANCE,ENERGY,HEALTH").split(",")
 
     # Rate Limiting
-    RATE_LIMIT_WINDOW_MS = int(os.getenv("RATE_LIMIT_WINDOW_MS", 60000))
-    RATE_LIMIT_MAX_REQUESTS = int(os.getenv("RATE_LIMIT_MAX_REQUESTS", 100))
+    RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
+    RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", 100))
+    RATE_LIMIT_WINDOW = int(os.getenv("RATE_LIMIT_WINDOW", 60))  # seconds
 
     # Logging
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
