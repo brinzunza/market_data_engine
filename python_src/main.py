@@ -47,6 +47,41 @@ class SimpleRateLimiter:
 rate_limiter = SimpleRateLimiter()
 
 
+class APIKeyMiddleware(BaseHTTPMiddleware):
+    """Middleware to validate API key for protected endpoints"""
+    async def dispatch(self, request: Request, call_next):
+        # Public endpoints that don't require API key
+        public_paths = ["/health", "/", "/docs", "/redoc", "/openapi.json"]
+
+        if request.url.path in public_paths:
+            return await call_next(request)
+
+        # Check if API key authentication is enabled
+        if not settings.API_KEY_ENABLED:
+            return await call_next(request)
+
+        # Get API key from header
+        api_key = request.headers.get("X-API-Key") or request.headers.get("Authorization")
+
+        # Support both "Bearer token" and direct token format
+        if api_key and api_key.startswith("Bearer "):
+            api_key = api_key[7:]  # Remove "Bearer " prefix
+
+        # Validate API key
+        if not api_key or api_key != settings.API_KEY:
+            logger.warning(f"Unauthorized access attempt from {request.client.host if request.client else 'unknown'}")
+            return JSONResponse(
+                status_code=401,
+                content={
+                    "error": "Unauthorized",
+                    "message": "Invalid or missing API key. Include 'X-API-Key' header with your request."
+                },
+                headers={"WWW-Authenticate": "ApiKey"}
+            )
+
+        return await call_next(request)
+
+
 class ClientIPMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         client_ip = request.client.host if request.client else "unknown"
@@ -102,7 +137,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Add client IP middleware
+# Add API key middleware (must be added before rate limiting)
+app.add_middleware(APIKeyMiddleware)
+
+# Add client IP middleware (includes rate limiting)
 app.add_middleware(ClientIPMiddleware)
 
 # Include routers
@@ -116,6 +154,12 @@ async def root():
         "name": "Synthetic Market Data API",
         "version": "1.0.0",
         "description": "Real-time synthetic stock market data with WebSocket and REST endpoints",
+        "authentication": {
+            "required": settings.API_KEY_ENABLED,
+            "method": "API Key",
+            "header": "X-API-Key",
+            "note": "Include API key in the 'X-API-Key' header for all protected endpoints"
+        },
         "endpoints": {
             "rest": {
                 "tickers": "GET /api/v1/tickers",

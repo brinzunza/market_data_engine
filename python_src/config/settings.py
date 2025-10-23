@@ -44,5 +44,9 @@ class Settings:
     # Logging
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
+    # Authentication
+    API_KEY_ENABLED = os.getenv("API_KEY_ENABLED", "true").lower() == "true"
+    API_KEY = os.getenv("API_KEY", "brunosapikey")
+
 
 settings = Settings()
