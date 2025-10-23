@@ -25,45 +25,56 @@ A real-time synthetic stock market data generator and API.
 - Docker and Docker Compose
 - Python 3.11+ (for local development)
 
+### Easy Setup (Recommended)
+
 1. Clone the repository:
 ```bash
-git clone 
-cd market_data_engine
+git clone <your-repo-url>
+cd synthDataAPI
 ```
 
-2. Copy environment variables:
+2. Start everything with one command:
+```bash
+./start.sh
+```
+
+That's it! The script will:
+- ✅ Build all Docker images
+- 🚀 Start all services (PostgreSQL, Kafka, API, Generator, Processor)
+- 🗄️ Initialize the database automatically
+- 📊 Display all endpoints and useful information
+
+3. Stop everything when done:
+```bash
+./stop.sh
+```
+
+### What Gets Started
+
+The `start.sh` script launches:
+- **PostgreSQL Database** (port 5432) - Time-series data storage
+- **Kafka + Zookeeper** (port 9092) - Message streaming
+- **Data Generator** - Creates synthetic market data using GBM
+- **Data Processor** - Consumes Kafka and stores to database
+- **API Server** (port 3000) - REST API + WebSocket endpoints
+
+### Manual Setup (Alternative)
+
+If you prefer manual control:
+
+1. Copy environment variables:
 ```bash
 cp .env.example .env
 ```
 
-3. Start all services:
+2. Start services:
 ```bash
 docker-compose up -d
 ```
 
-This will start:
-- TimescaleDB (PostgreSQL with time-series extension)
-- Kafka + Zookeeper
-- Data Generator (GBM simulation)
-- Data Processor (Kafka → Database)
-- API Server (REST + WebSocket)
-
 3. Initialize database:
 ```bash
-python3 -m python_src.db.init
-```
-
-4. Start services in separate terminals:
-
-```bash
-# Terminal 1: Data Generator
-python3 -m python_src.services.data_generator
-
-# Terminal 2: Data Processor
-python3 -m python_src.services.data_processor
-
-# Terminal 3: API Server
-uvicorn python_src.main:app --host 0.0.0.0 --port 3000 --reload
+docker-compose exec -T postgres psql -U postgres -d synthetic_market < python_src/db/schema.sql
 ```
 
 ## API Endpoints
@@ -218,6 +229,40 @@ The system includes 5 pre-configured synthetic tickers with different characteri
 | ENERGY | Energy Solutions | Energy | $65 | 2% | 25% | Commodity-like behavior |
 | HEALTH | Healthcare Partners | Healthcare | $180 | 6% | 18% | Moderate growth |
 
+
+## Useful Commands
+
+### View Logs
+```bash
+# All services
+docker-compose logs -f
+
+# Specific service
+docker-compose logs -f api
+docker-compose logs -f generator
+docker-compose logs -f processor
+```
+
+### Restart Services
+```bash
+./stop.sh && ./start.sh
+```
+
+### Complete Reset (Remove All Data)
+```bash
+docker-compose down -v
+./start.sh
+```
+
+### Check Service Status
+```bash
+docker-compose ps
+```
+
+### Access Database
+```bash
+docker-compose exec postgres psql -U postgres -d synthetic_market
+```
 
 ## Development
 
