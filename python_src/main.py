@@ -60,10 +60,17 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         if not settings.API_KEY_ENABLED:
             return await call_next(request)
 
-        # Get API key from header
+        # Get API key from multiple sources (in order of precedence):
+        # 1. Header: X-API-Key
+        # 2. Header: Authorization
+        # 3. Query parameter: api_key
         api_key = request.headers.get("X-API-Key") or request.headers.get("Authorization")
 
-        # Support both "Bearer token" and direct token format
+        # If not in headers, check query parameters
+        if not api_key:
+            api_key = request.query_params.get("api_key")
+
+        # Support both "Bearer token" and direct token format for Authorization header
         if api_key and api_key.startswith("Bearer "):
             api_key = api_key[7:]  # Remove "Bearer " prefix
 
@@ -74,7 +81,7 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
                 status_code=401,
                 content={
                     "error": "Unauthorized",
-                    "message": "Invalid or missing API key. Include 'X-API-Key' header with your request."
+                    "message": "Invalid or missing API key. Include 'X-API-Key' header or '?api_key=' query parameter with your request."
                 },
                 headers={"WWW-Authenticate": "ApiKey"}
             )
@@ -157,8 +164,12 @@ async def root():
         "authentication": {
             "required": settings.API_KEY_ENABLED,
             "method": "API Key",
-            "header": "X-API-Key",
-            "note": "Include API key in the 'X-API-Key' header for all protected endpoints"
+            "options": [
+                "Header: X-API-Key",
+                "Header: Authorization (Bearer)",
+                "Query Parameter: ?api_key="
+            ],
+            "note": "Include API key in header or as query parameter. Example: /api/v1/tickers?api_key=brunosapikey"
         },
         "endpoints": {
             "rest": {
