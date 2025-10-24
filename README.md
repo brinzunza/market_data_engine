@@ -82,21 +82,25 @@ docker-compose exec -T postgres psql -U postgres -d synthetic_market < python_sr
 
 All API endpoints (except `/`, `/health`, and `/docs`) require an API key for authentication.
 
-### Method 1: Query Parameter (Browser-Friendly)
-Add `?api_key=brunosapikey` to any URL:
-```
-http://localhost:3000/api/v1/tickers?api_key=brunosapikey
-```
-
-You can paste this directly into your browser! 🌐
-
-### Method 2: Header (For API Clients)
-Include the API key in your request headers:
+**Include the API key in your request headers:**
 ```bash
-curl -H "X-API-Key: brunosapikey" http://localhost:3000/api/v1/tickers
+X-API-Key: brunosapikey
 ```
 
-For detailed authentication documentation, see [AUTHENTICATION.md](AUTHENTICATION.md).
+**Example:**
+```bash
+# Get all tickers
+http://localhost:3000/api/v1/tickers?api_key=brunosapikey
+
+# Get SYNTH quote
+http://localhost:3000/api/v1/quote/SYNTH?api_key=brunosapikey
+
+# Get 1-minute bars
+http://localhost:3000/api/v1/bars/SYNTH?api_key=brunosapikey&timeframe=1m&limit=10
+
+# Get stats
+http://localhost:3000/api/v1/stats/SYNTH?api_key=brunosapikey&period=1d
+```
 
 ## API Endpoints
 
@@ -107,13 +111,6 @@ Base URL: `http://localhost:3000/api/v1`
 **Note:** All endpoints below require the `X-API-Key` header.
 
 #### Get All Tickers
-
-**Browser (direct link):**
-```
-http://localhost:3000/api/v1/tickers?api_key=brunosapikey
-```
-
-**cURL:**
 ```bash
 curl -H "X-API-Key: brunosapikey" http://localhost:3000/api/v1/tickers
 ```
@@ -134,13 +131,6 @@ curl -H "X-API-Key: brunosapikey" http://localhost:3000/api/v1/tickers
 ```
 
 #### Get Latest Quote
-
-**Browser (direct link):**
-```
-http://localhost:3000/api/v1/quote/SYNTH?api_key=brunosapikey
-```
-
-**cURL:**
 ```bash
 curl -H "X-API-Key: brunosapikey" http://localhost:3000/api/v1/quote/SYNTH
 ```
