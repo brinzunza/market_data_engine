@@ -77,7 +77,7 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
             api_key = api_key[7:]  # Remove "Bearer " prefix
 
         # Validate API key
-        if not api_key or api_key != settings.API_KEY:
+        if not api_key or api_key not in settings.API_KEYS:
             logger.warning(f"Unauthorized access attempt from {request.client.host if request.client else 'unknown'}")
             return JSONResponse(
                 status_code=401,

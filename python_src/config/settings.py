@@ -46,7 +46,9 @@ class Settings:
 
     # Authentication
     API_KEY_ENABLED = os.getenv("API_KEY_ENABLED", "true").lower() == "true"
-    API_KEY = os.getenv("API_KEY", "brunosapikey")
-
+    API_KEY = os.getenv("API_KEY", "")
+    API_KEYS = API_KEY.split(",")
+    if len(API_KEYS) == 0:
+        raise ValueError("API_KEYS is not set")
 
 settings = Settings()
