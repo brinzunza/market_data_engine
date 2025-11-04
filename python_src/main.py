@@ -5,7 +5,7 @@ import logging
 import time
 from contextlib import asynccontextmanager
 from typing import Dict, List
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -20,7 +20,7 @@ setup_logger()
 logger = logging.getLogger(__name__)
 
 
-class SimpleRateLimiter:
+class RateLimiter:
     def __init__(self):
         self.requests: Dict[str, List[float]] = {}
 
@@ -44,14 +44,16 @@ class SimpleRateLimiter:
         return True, settings.RATE_LIMIT_REQUESTS - len(self.requests[client_ip]), 0
 
 
-rate_limiter = SimpleRateLimiter()
+rate_limiter = RateLimiter()
 
 
 class APIKeyMiddleware(BaseHTTPMiddleware):
     """Middleware to validate API key for protected endpoints"""
     async def dispatch(self, request: Request, call_next):
         # Public endpoints that don't require API key
-        public_paths = ["/health", "/", "/docs", "/redoc", "/openapi.json"]
+        public_paths = ["/health", "/", "/docs", "/redoc", "/openapi.json", "/ws"]
+
+        logger.info(f"APIKeyMiddleware: path={request.url.path}, in public={request.url.path in public_paths}")
 
         if request.url.path in public_paths:
             return await call_next(request)
@@ -200,7 +202,7 @@ async def health():
 
 
 @app.websocket("/ws")
-async def websocket_route(websocket):
+async def websocket_route(websocket: WebSocket):
     """WebSocket endpoint for real-time market data"""
     client_id = str(uuid4())
     await websocket_endpoint(websocket, client_id)

@@ -2,7 +2,7 @@
 Geometric Brownian Motion (GBM) Generator
 
 Implements the stochastic differential equation:
-dS_t = μ * S_t * dt + σ * S_t * dW_t
+dS_t = μ * S_t * deltatime + σ * S_t * dW_t
 
 Where:
 - S_t: Asset price at time t
@@ -16,12 +16,12 @@ import time
 
 
 class GBMGenerator:
-    def __init__(self, ticker, start_price, drift, volatility, dt=0.0001, min_price=1, max_price=10000):
+    def __init__(self, ticker, start_price, drift, volatility, deltatime=0.0001, min_price=1, max_price=10000):
         self.ticker = ticker
         self.current_price = start_price
         self.drift = drift  # μ (mu)
         self.volatility = volatility  # σ (sigma)
-        self.dt = dt  # Time step (smaller = more granular)
+        self.deltatime = deltatime  # Time step (smaller = more granular)
         self.min_price = min_price
         self.max_price = max_price
 
@@ -34,13 +34,13 @@ class GBMGenerator:
         random_shock = np.random.normal(0, 1)
 
         # Calculate price change using GBM formula
-        drift_term = self.drift * self.current_price * self.dt
-        diffusion_term = self.volatility * self.current_price * np.sqrt(self.dt) * random_shock
+        drift_term = self.drift * self.current_price * self.deltatime
+        diffusion_term = self.volatility * self.current_price * np.sqrt(self.deltatime) * random_shock
 
         # Update price
         new_price = self.current_price + drift_term + diffusion_term
 
-        # Apply bounds
+        # Apply bounds to avoid negatives and extreme values due to volatility
         new_price = max(self.min_price, min(self.max_price, new_price))
 
         self.current_price = new_price

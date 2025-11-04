@@ -33,17 +33,12 @@ A real-time synthetic stock market data generator and API.
 git clone <your-repo-url>
 cd synthDataAPI
 ```
+*Make sure you have docker desktop open*
 
 2. Start everything with one command:
 ```bash
 ./start.sh
 ```
-
-That's it! The script will:
-- ✅ Build all Docker images
-- 🚀 Start all services (PostgreSQL, Kafka, API, Generator, Processor)
-- 🗄️ Initialize the database automatically
-- 📊 Display all endpoints and useful information
 
 3. Stop everything when done:
 ```bash
@@ -59,23 +54,6 @@ The `start.sh` script launches:
 - **Data Processor** - Consumes Kafka and stores to database
 - **API Server** (port 3000) - REST API + WebSocket endpoints
 
-### Manual Setup (Alternative)
-
-If you prefer manual control:
-
-1. Copy environment variables:
-```bash
-cp .env.example .env
-```
-
-2. Start services:
-```bash
-docker-compose up -d
-```
-
-3. Initialize database:
-```bash
-docker-compose exec -T postgres psql -U postgres -d synthetic_market < python_src/db/schema.sql
 ```
 
 ## Authentication
