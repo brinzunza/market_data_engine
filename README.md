@@ -271,7 +271,7 @@ docker-compose exec postgres psql -U postgres -d synthetic_market
 
 ### Adding New Tickers
 
-Edit `python_src/services/data_generator.py` and add to `TICKER_CONFIGS`:
+Edit `src/services/data_generator.py` and add to `TICKER_CONFIGS`:
 
 ```python
 "NEWTICKER": {

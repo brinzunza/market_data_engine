@@ -64,7 +64,7 @@ services:
       KAFKA_BROKERS: kafka:29092
       GENERATOR_INTERVAL_MS: 100
       TICKERS: SYNTH,TECH,FINANCE,ENERGY,HEALTH
-    command: python -m python_src.services.data_generator
+    command: python -m src.services.data_generator
     restart: unless-stopped
 
   # Data Processor Service
@@ -85,7 +85,7 @@ services:
       DB_USER: postgres
       DB_PASSWORD: postgres
       KAFKA_BROKERS: kafka:29092
-    command: python -m python_src.services.data_processor
+    command: python -m src.services.data_processor
     restart: unless-stopped
 
   # API Server
@@ -110,7 +110,7 @@ services:
       DB_USER: postgres
       DB_PASSWORD: postgres
       KAFKA_BROKERS: kafka:29092
-    command: uvicorn python_src.main:app --host 0.0.0.0 --port 3000
+    command: uvicorn src.main:app --host 0.0.0.0 --port 3000
     restart: unless-stopped
 
 volumes:

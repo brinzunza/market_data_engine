@@ -89,7 +89,7 @@ The system is built using a **microservices architecture** with these main parts
 
 ## Core Components
 
-### 1. **Data Generator** (`python_src/services/data_generator.py`)
+### 1. **Data Generator** (`src/services/data_generator.py`)
 **What it does:** Creates fake stock prices continuously
 
 **How it works:**
@@ -100,7 +100,7 @@ The system is built using a **microservices architecture** with these main parts
 
 **Think of it as:** A machine that prints fake stock ticker tape 24/7
 
-### 2. **Geometric Brownian Motion Model** (`python_src/models/gbm_generator.py`)
+### 2. **Geometric Brownian Motion Model** (`src/models/gbm_generator.py`)
 **What it does:** The mathematical brain that makes prices look realistic
 
 **How it works:**
@@ -139,7 +139,7 @@ New Price = Current Price + Drift + Random Shock
 - **Scalability**: Can handle millions of messages per second
 - **Reliability**: If one service crashes, messages are saved for later
 
-### 4. **Data Processor** (`python_src/services/data_processor.py`)
+### 4. **Data Processor** (`src/services/data_processor.py`)
 **What it does:** Saves the generated data to the database
 
 **How it works:**
@@ -204,7 +204,7 @@ time                | ticker | timeframe | open   | high   | low    | close  | v
 - **Retention Policy**: Automatically deletes data older than 30 days
 - **Time-bucket queries**: Fast aggregation by time periods
 
-### 6. **API Server** (`python_src/main.py`)
+### 6. **API Server** (`src/main.py`)
 **What it does:** The main web server that handles all requests
 
 **How it works:**
@@ -220,7 +220,7 @@ time                | ticker | timeframe | open   | high   | low    | close  | v
 3. **Auto-generated docs**: Available at `/docs` (Swagger UI)
 4. **Type validation**: Automatic request/response validation using Pydantic
 
-### 7. **REST API Routes** (`python_src/routes/market_data.py`)
+### 7. **REST API Routes** (`src/routes/market_data.py`)
 **What it does:** Defines all the API endpoints
 
 **Available Endpoints:**
@@ -297,7 +297,7 @@ Gets statistical analysis:
 }
 ```
 
-### 8. **WebSocket Server** (`python_src/routes/websocket.py`)
+### 8. **WebSocket Server** (`src/routes/websocket.py`)
 **What it does:** Streams real-time data to connected clients
 
 **How it works:**
@@ -782,7 +782,7 @@ pong = await websocket.recv()
 
 2. **Initialize Database**
    ```bash
-   python -m python_src.db.init
+   python -m src.db.init
    ```
    This creates:
    - Tables (tickers, market_ticks, market_bars)
@@ -792,21 +792,21 @@ pong = await websocket.recv()
 
 3. **Start Data Generator**
    ```bash
-   python -m python_src.services.data_generator
+   python -m src.services.data_generator
    ```
    Starts generating tick data every 100ms
 
 4. **Start Data Processor** (optional, in another terminal)
    ```bash
-   python -m python_src.services.data_processor
+   python -m src.services.data_processor
    ```
    Starts saving data to database
 
 5. **Start API Server**
    ```bash
-   python -m python_src.main
+   python -m src.main
    # or
-   uvicorn python_src.main:app --reload --port 3000
+   uvicorn src.main:app --reload --port 3000
    ```
    API available at http://localhost:3000
    Swagger docs at http://localhost:3000/docs
@@ -924,7 +924,7 @@ TICKERS=SYNTH,TECH,FINANCE,ENERGY,HEALTH  # Active tickers
 
 ### Stock Configuration (in code)
 
-Edit `python_src/services/data_generator.py` to customize stocks:
+Edit `src/services/data_generator.py` to customize stocks:
 
 ```python
 TICKER_CONFIGS = {

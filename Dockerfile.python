@@ -13,11 +13,11 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY python_src ./python_src
+COPY src ./src
 COPY .env .env
 
 # Set Python path
 ENV PYTHONPATH=/app
 
 # Default command (can be overridden in docker-compose)
-CMD ["python", "-m", "python_src.main"]
+CMD ["python", "-m", "src.main"]
