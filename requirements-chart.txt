@@ -1,0 +1,13 @@
+# Requirements for Live OHLC Chart
+# Install with: pip install -r requirements-chart.txt
+
+# Core chart dependencies
+plotly==5.18.0
+pandas==2.1.4
+numpy==1.26.3
+
+# WebSocket client
+websockets==12.0
+
+# Optional: for better performance
+kaleido==0.2.1  # Static image export
