@@ -300,3 +300,63 @@ docker-compose -f docker-compose.python.yml exec timescaledb psql -U postgres -d
 - **API**: Async FastAPI with high concurrency
 - **WebSocket**: Unlimited real-time connections (within server capacity)
 - **Data Retention**: 30 days (configurable)
+
+To run chart example 
+
+## Installation
+
+1. **Install chart dependencies**:
+```bash
+pip install -r requirements-chart.txt
+```
+
+Or install manually:
+```bash
+pip install plotly pandas websockets numpy
+```
+
+2. **Ensure the API is running**:
+```bash
+# Start the API (if not already running)
+docker-compose up
+```
+
+## Usage
+
+### Basic Usage (Single Ticker)
+
+```bash
+python src/chart/live_chart.py
+```
+
+### Advanced Usage
+
+**Multiple Tickers**:
+```bash
+python src/chart/live_chart.py --tickers SYNTH TECH FINANCE
+```
+
+**Custom Bar Interval** (e.g., 10-second bars):
+```bash
+python src/chart/live_chart.py --interval 10
+```
+
+**Custom WebSocket URL**:
+```bash
+python src/chart/live_chart.py --ws-url ws://your-server:3000/ws
+```
+
+**Save Chart to HTML** (instead of opening browser):
+```bash
+python src/chart/live_chart.py --mode save
+```
+
+**More Bars** (e.g., 200 bars on screen):
+```bash
+python src/chart/live_chart.py --max-bars 200
+```
+
+**Faster Updates** (e.g., update every 0.5 seconds):
+```bash
+python src/chart/live_chart.py --update-rate 0.5
+```
