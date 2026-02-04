@@ -7,6 +7,7 @@ import signal
 from aiokafka import AIOKafkaProducer
 from ..config.settings import settings
 from ..models.gbm_generator import GBMGenerator
+from ..monitoring.collector import metrics
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +122,13 @@ class DataGeneratorService:
                     tasks.append(task)
 
                 # Wait for all sends to complete
+                produce_start = asyncio.get_event_loop().time()
                 await asyncio.gather(*tasks)
+                produce_latency_ms = (asyncio.get_event_loop().time() - produce_start) * 1000
+
+                # --- monitoring ---
+                metrics.counter("generator.ticks_produced", len(self.generators))
+                metrics.histogram("generator.produce_latency_ms", produce_latency_ms)
 
                 tick_count += len(self.generators)
 

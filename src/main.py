@@ -11,9 +11,12 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from uuid import uuid4
 from .routes.market_data import router as market_data_router
+from .routes.monitoring import router as monitoring_router
+from .routes.dashboard import router as dashboard_router
 from .routes.websocket import websocket_endpoint, ws_manager
 from .config.logger import setup_logger
 from .config.settings import settings
+from .monitoring.alerts import alert_loop
 
 # Setup logging
 setup_logger()
@@ -51,7 +54,9 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
     """Middleware to validate API key for protected endpoints"""
     async def dispatch(self, request: Request, call_next):
         # Public endpoints that don't require API key
-        public_paths = ["/health", "/", "/docs", "/redoc", "/openapi.json", "/ws"]
+        public_paths = ["/health", "/", "/docs", "/redoc", "/openapi.json", "/ws",
+                        "/api/v1/monitor/stats", "/api/v1/monitor/alerts", "/api/v1/monitor/health",
+                        "/monitor"]
 
         logger.info(f"APIKeyMiddleware: path={request.url.path}, in public={request.url.path in public_paths}")
 
@@ -122,6 +127,9 @@ async def lifespan(app: FastAPI):
     # Start WebSocket Kafka consumer in background
     asyncio.create_task(ws_manager.start_kafka_consumer())
 
+    # Start monitoring alert loop in background
+    asyncio.create_task(alert_loop())
+
     yield
 
     # Shutdown
@@ -154,6 +162,8 @@ app.add_middleware(ClientIPMiddleware)
 
 # Include routers
 app.include_router(market_data_router)
+app.include_router(monitoring_router)
+app.include_router(dashboard_router)
 
 
 @app.get("/")

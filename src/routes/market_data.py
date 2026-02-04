@@ -1,10 +1,12 @@
 """REST API routes for market data"""
 
+import time as _time
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
 from datetime import datetime, timedelta
 import logging
 from ..config.database import db_pool
+from ..monitoring.collector import metrics
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1", tags=["market-data"])
@@ -13,6 +15,7 @@ router = APIRouter(prefix="/api/v1", tags=["market-data"])
 @router.get("/tickers")
 async def get_tickers():
     """Get list of all available tickers"""
+    _start = _time.time()
     try:
         conn = db_pool.get_connection()
         cursor = conn.cursor()
@@ -26,15 +29,20 @@ async def get_tickers():
         cursor.close()
         db_pool.return_connection(conn)
 
+        metrics.counter("api.requests")
+        metrics.histogram("api.request_latency_ms", (_time.time() - _start) * 1000)
         return {"success": True, "data": tickers}
     except Exception as e:
         logger.error(f"Error fetching tickers: {e}")
+        metrics.counter("api.errors")
+        metrics.histogram("api.request_latency_ms", (_time.time() - _start) * 1000)
         raise HTTPException(status_code=500, detail="Failed to fetch tickers")
 
 
 @router.get("/quote/{ticker}")
 async def get_quote(ticker: str):
     """Get latest quote for a ticker"""
+    _start = _time.time()
     try:
         conn = db_pool.get_connection()
         cursor = conn.cursor()
@@ -54,14 +62,19 @@ async def get_quote(ticker: str):
         db_pool.return_connection(conn)
 
         if not row:
+            metrics.counter("api.errors")
             raise HTTPException(status_code=404, detail="Ticker not found")
 
         quote = dict(zip(columns, row))
+        metrics.counter("api.requests")
+        metrics.histogram("api.request_latency_ms", (_time.time() - _start) * 1000)
         return {"success": True, "data": quote}
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error fetching quote: {e}")
+        metrics.counter("api.errors")
+        metrics.histogram("api.request_latency_ms", (_time.time() - _start) * 1000)
         raise HTTPException(status_code=500, detail="Failed to fetch quote")
 
 
@@ -73,6 +86,7 @@ async def get_history(
     limit: int = Query(default=1000, le=10000)
 ):
     """Get historical tick data"""
+    _start = _time.time()
     try:
         start_time = datetime.fromisoformat(start) if start else datetime.now() - timedelta(hours=1)
         end_time = datetime.fromisoformat(end) if end else datetime.now()
@@ -99,6 +113,8 @@ async def get_history(
         cursor.close()
         db_pool.return_connection(conn)
 
+        metrics.counter("api.requests")
+        metrics.histogram("api.request_latency_ms", (_time.time() - _start) * 1000)
         return {
             "success": True,
             "data": ticks,
@@ -111,6 +127,8 @@ async def get_history(
         }
     except Exception as e:
         logger.error(f"Error fetching history: {e}")
+        metrics.counter("api.errors")
+        metrics.histogram("api.request_latency_ms", (_time.time() - _start) * 1000)
         raise HTTPException(status_code=500, detail="Failed to fetch historical data")
 
 
@@ -123,6 +141,7 @@ async def get_bars(
     limit: int = Query(default=500, le=5000)
 ):
     """Get OHLCV bars using aggregation"""
+    _start = _time.time()
     try:
         start_time = datetime.fromisoformat(start) if start else datetime.now() - timedelta(days=1)
         end_time = datetime.fromisoformat(end) if end else datetime.now()
@@ -179,6 +198,8 @@ async def get_bars(
         cursor.close()
         db_pool.return_connection(conn)
 
+        metrics.counter("api.requests")
+        metrics.histogram("api.request_latency_ms", (_time.time() - _start) * 1000)
         return {
             "success": True,
             "data": bars,
@@ -192,6 +213,8 @@ async def get_bars(
         }
     except Exception as e:
         logger.error(f"Error fetching bars: {e}")
+        metrics.counter("api.errors")
+        metrics.histogram("api.request_latency_ms", (_time.time() - _start) * 1000)
         raise HTTPException(status_code=500, detail="Failed to fetch bar data")
 
 
@@ -201,6 +224,7 @@ async def get_stats(
     period: str = Query(default="1d", regex="^(1h|1d|7d|30d)$")
 ):
     """Get statistics for a ticker"""
+    _start = _time.time()
     try:
         interval_map = {
             "1h": "1 hour",
@@ -253,9 +277,13 @@ async def get_stats(
         stats["change_pct"] = round(change_pct, 2)
         stats["period"] = period
 
+        metrics.counter("api.requests")
+        metrics.histogram("api.request_latency_ms", (_time.time() - _start) * 1000)
         return {"success": True, "data": stats}
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error fetching stats: {e}")
+        metrics.counter("api.errors")
+        metrics.histogram("api.request_latency_ms", (_time.time() - _start) * 1000)
         raise HTTPException(status_code=500, detail="Failed to fetch statistics")

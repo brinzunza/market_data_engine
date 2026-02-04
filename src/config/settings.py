@@ -46,9 +46,8 @@ class Settings:
 
     # Authentication
     API_KEY_ENABLED = os.getenv("API_KEY_ENABLED", "true").lower() == "true"
-    API_KEY = os.getenv("API_KEY", "")
-    API_KEYS = API_KEY.split(",")
-    if len(API_KEYS) == 0:
-        raise ValueError("API_KEYS is not set")
+    API_KEYS = [k.strip() for k in os.getenv("API_KEYS", "").split(",") if k.strip()]
+    if API_KEY_ENABLED and len(API_KEYS) == 0:
+        raise ValueError("API_KEYS is not set in .env")
 
 settings = Settings()

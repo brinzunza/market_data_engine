@@ -8,6 +8,7 @@ from datetime import datetime
 from aiokafka import AIOKafkaConsumer
 from ..config.settings import settings
 from ..config.database import db_pool
+from ..monitoring.collector import metrics
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +68,8 @@ class DataProcessorService:
         """Process a single tick"""
         try:
             self.tick_buffer.append(tick)
+            metrics.counter("processor.ticks_consumed")
+            metrics.gauge("processor.buffer_depth", len(self.tick_buffer))
 
             # Flush if batch size reached
             if len(self.tick_buffer) >= self.batch_size:
@@ -81,6 +84,7 @@ class DataProcessorService:
             return
 
         conn = None
+        flush_start = asyncio.get_event_loop().time()
         try:
             ticks = self.tick_buffer.copy()
             self.tick_buffer.clear()
@@ -111,11 +115,18 @@ class DataProcessorService:
             conn.commit()
             cursor.close()
 
+            # --- monitoring ---
+            flush_latency_ms = (asyncio.get_event_loop().time() - flush_start) * 1000
+            metrics.histogram("processor.flush_latency_ms", flush_latency_ms)
+            metrics.counter("processor.ticks_flushed", len(ticks))
+            metrics.gauge("processor.buffer_depth", len(self.tick_buffer))
+
             logger.info(f"Flushed {len(ticks)} ticks to database")
             self.last_flush = asyncio.get_event_loop().time()
 
         except Exception as e:
             logger.error(f"Error flushing ticks to database: {e}")
+            metrics.counter("processor.flush_errors")
             if conn:
                 conn.rollback()
             # Put ticks back in buffer on error
