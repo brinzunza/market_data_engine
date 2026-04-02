@@ -235,6 +235,7 @@ let ws = null;
 let reconnectDelay = 1000;
 let tickCount = 0;
 let isLoadingHistory = false;
+let historyLoaded = false;
 
 // Get bar timestamp
 function getBarTimestamp(tickTimestamp) {
@@ -282,7 +283,11 @@ async function loadHistoricalBars(ticker, intervalSeconds, maxBars = 100) {
     const barMap = new Map();
 
     ticks.forEach(tick => {
-      const barTimestamp = getBarTimestamp(tick.timestamp);
+      // Convert time string to timestamp (milliseconds)
+      // The time string is in format "2026-04-02T06:25:25.800000"
+      // Parse it directly as UTC to avoid timezone issues
+      const tickTime = new Date(tick.time + 'Z').getTime(); // Add 'Z' to force UTC
+      const barTimestamp = getBarTimestamp(tickTime);
 
       if (!barMap.has(barTimestamp)) {
         barMap.set(barTimestamp, new OHLCBar(barTimestamp));
@@ -300,8 +305,23 @@ async function loadHistoricalBars(ticker, intervalSeconds, maxBars = 100) {
     bars = historicalBars;
     console.log(`Created ${bars.length} historical bars`);
 
+    // Set the last historical bar as the current bar if it exists
+    // This way, live ticks can continue updating it
+    if (bars.length > 0) {
+      const lastBar = bars[bars.length - 1];
+      const now = Date.now();
+      const lastBarEnd = lastBar.timestamp + (intervalSeconds * 1000);
+
+      // If the last historical bar is still in the current time window, make it current
+      if (now < lastBarEnd) {
+        currentBar = bars.pop(); // Remove from bars array, will be re-added when complete
+        console.log(`Continuing last historical bar at ${new Date(currentBar.timestamp).toISOString()}`);
+      }
+    }
+
     // Update chart with historical data
     updateChart();
+    historyLoaded = true;
 
   } catch (error) {
     console.error('Error loading historical bars:', error);
@@ -322,13 +342,37 @@ function processTick(tick) {
 
   const barTimestamp = getBarTimestamp(timestamp);
 
+  // Debug logging
+  if (tickCount < 5 || tickCount % 100 === 0) {
+    console.log(`Tick ${tickCount}: timestamp=${timestamp}, barTimestamp=${barTimestamp}, date=${new Date(barTimestamp).toISOString()}`);
+    if (bars.length > 0) {
+      console.log(`  Last historical bar: ${new Date(bars[bars.length - 1].timestamp).toISOString()}`);
+    }
+    if (currentBar) {
+      console.log(`  Current bar: ${new Date(currentBar.timestamp).toISOString()}`);
+    }
+  }
+
+  // Check if this tick belongs to an existing historical bar
+  const existingBarIndex = bars.findIndex(b => b.timestamp === barTimestamp);
+  if (existingBarIndex !== -1) {
+    // Update existing historical bar
+    bars[existingBarIndex].update(price, volume);
+    tickCount++;
+    updateChart();
+    return;
+  }
+
   // Create new bar if needed
   if (!currentBar || currentBar.timestamp !== barTimestamp) {
     if (currentBar && currentBar.isComplete()) {
+      // Always add to the end - bars should be chronological
       bars.push(currentBar);
       if (bars.length > MAX_BARS) bars.shift();
+      console.log(`Completed bar: ${new Date(currentBar.timestamp).toISOString()}, total bars: ${bars.length}`);
     }
     currentBar = new OHLCBar(barTimestamp);
+    console.log(`New current bar created: ${new Date(barTimestamp).toISOString()}`);
   }
 
   currentBar.update(price, volume);
@@ -477,16 +521,18 @@ function connect() {
   ws.onopen = async () => {
     console.log('✓ WebSocket connected');
     reconnectDelay = 1000;
-    setStatus(true, 'Live');
+    setStatus(false, 'Loading history...');
 
-    // Load historical bars first
+    // Load historical bars FIRST before subscribing
     await loadHistoricalBars(currentTicker, barInterval, MAX_BARS);
 
-    // Subscribe to ticker for live updates
+    // NOW subscribe to ticker for live updates
+    setStatus(true, 'Live');
     ws.send(JSON.stringify({
       type: 'subscribe',
       tickers: [currentTicker]
     }));
+    console.log('✓ Subscribed to live ticks');
   };
 
   ws.onmessage = (event) => {
@@ -547,6 +593,7 @@ document.getElementById('tickerSelect').addEventListener('change', (e) => {
   bars = [];
   currentBar = null;
   tickCount = 0;
+  historyLoaded = false;
 
   // Clear stats
   document.getElementById('statPrice').textContent = '—';
@@ -584,6 +631,7 @@ document.getElementById('intervalSelect').addEventListener('change', (e) => {
   bars = [];
   currentBar = null;
   tickCount = 0;
+  historyLoaded = false;
 
   // Clear stats
   document.getElementById('statPrice').textContent = '—';
