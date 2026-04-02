@@ -16,7 +16,11 @@ Quick Start:
 See src/chart/README.md for full documentation.
 """
 
-from .live_chart import LiveOHLCChart, OHLCBar
+from .live_chart import LiveChart, OHLCBar
+from .tradingview_chart import TradingViewChart
 
-__all__ = ['LiveOHLCChart', 'OHLCBar']
+# Alias for backwards compatibility
+LiveOHLCChart = LiveChart
+
+__all__ = ['LiveChart', 'LiveOHLCChart', 'TradingViewChart', 'OHLCBar']
 __version__ = '1.0.0'

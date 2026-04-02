@@ -7,6 +7,8 @@ from datetime import datetime, timedelta
 import logging
 from ..config.database import db_pool
 from ..monitoring.collector import metrics
+from ..config.settings import settings
+from ..cache import get_cache
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1", tags=["market-data"])
@@ -16,6 +18,21 @@ router = APIRouter(prefix="/api/v1", tags=["market-data"])
 async def get_tickers():
     """Get list of all available tickers"""
     _start = _time.time()
+    cache_key = "tickers:all"
+
+    # Try cache first
+    if settings.CACHE_ENABLED:
+        cache = get_cache()
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            metrics.counter("api.requests")
+            metrics.counter("cache.hits")
+            metrics.histogram("api.request_latency_ms", (_time.time() - _start) * 1000)
+            logger.debug("Cache hit for /tickers")
+            return cached_data
+        metrics.counter("cache.misses")
+
+    # Cache miss - query database
     try:
         conn = db_pool.get_connection()
         cursor = conn.cursor()
@@ -29,9 +46,16 @@ async def get_tickers():
         cursor.close()
         db_pool.return_connection(conn)
 
+        result = {"success": True, "data": tickers}
+
+        # Store in cache
+        if settings.CACHE_ENABLED:
+            cache.set(cache_key, result, settings.CACHE_TICKERS_TTL)
+            logger.debug(f"Cached /tickers with TTL={settings.CACHE_TICKERS_TTL}s")
+
         metrics.counter("api.requests")
         metrics.histogram("api.request_latency_ms", (_time.time() - _start) * 1000)
-        return {"success": True, "data": tickers}
+        return result
     except Exception as e:
         logger.error(f"Error fetching tickers: {e}")
         metrics.counter("api.errors")
@@ -43,6 +67,22 @@ async def get_tickers():
 async def get_quote(ticker: str):
     """Get latest quote for a ticker"""
     _start = _time.time()
+    ticker_upper = ticker.upper()
+    cache_key = f"quote:{ticker_upper}"
+
+    # Try cache first
+    if settings.CACHE_ENABLED:
+        cache = get_cache()
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            metrics.counter("api.requests")
+            metrics.counter("cache.hits")
+            metrics.histogram("api.request_latency_ms", (_time.time() - _start) * 1000)
+            logger.debug(f"Cache hit for /quote/{ticker_upper}")
+            return cached_data
+        metrics.counter("cache.misses")
+
+    # Cache miss - query database
     try:
         conn = db_pool.get_connection()
         cursor = conn.cursor()
@@ -52,7 +92,7 @@ async def get_quote(ticker: str):
                WHERE ticker = %s
                ORDER BY time DESC
                LIMIT 1""",
-            (ticker.upper(),)
+            (ticker_upper,)
         )
 
         columns = [desc[0] for desc in cursor.description]
@@ -66,9 +106,16 @@ async def get_quote(ticker: str):
             raise HTTPException(status_code=404, detail="Ticker not found")
 
         quote = dict(zip(columns, row))
+        result = {"success": True, "data": quote}
+
+        # Store in cache with short TTL (quote data changes frequently)
+        if settings.CACHE_ENABLED:
+            cache.set(cache_key, result, settings.CACHE_QUOTE_TTL)
+            logger.debug(f"Cached /quote/{ticker_upper} with TTL={settings.CACHE_QUOTE_TTL}s")
+
         metrics.counter("api.requests")
         metrics.histogram("api.request_latency_ms", (_time.time() - _start) * 1000)
-        return {"success": True, "data": quote}
+        return result
     except HTTPException:
         raise
     except Exception as e:
@@ -225,6 +272,22 @@ async def get_stats(
 ):
     """Get statistics for a ticker"""
     _start = _time.time()
+    ticker_upper = ticker.upper()
+    cache_key = f"stats:{ticker_upper}:{period}"
+
+    # Try cache first
+    if settings.CACHE_ENABLED:
+        cache = get_cache()
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            metrics.counter("api.requests")
+            metrics.counter("cache.hits")
+            metrics.histogram("api.request_latency_ms", (_time.time() - _start) * 1000)
+            logger.debug(f"Cache hit for /stats/{ticker_upper}?period={period}")
+            return cached_data
+        metrics.counter("cache.misses")
+
+    # Cache miss - query database
     try:
         interval_map = {
             "1h": "1 hour",
@@ -257,7 +320,7 @@ async def get_stats(
                WHERE ticker = %s
                  AND time >= NOW() - %s::interval
                GROUP BY ticker""",
-            (ticker.upper(), interval, ticker.upper(), interval, ticker.upper(), interval)
+            (ticker_upper, interval, ticker_upper, interval, ticker_upper, interval)
         )
 
         columns = [desc[0] for desc in cursor.description]
@@ -277,9 +340,16 @@ async def get_stats(
         stats["change_pct"] = round(change_pct, 2)
         stats["period"] = period
 
+        result = {"success": True, "data": stats}
+
+        # Store in cache (stats are computationally expensive)
+        if settings.CACHE_ENABLED:
+            cache.set(cache_key, result, settings.CACHE_STATS_TTL)
+            logger.debug(f"Cached /stats/{ticker_upper}?period={period} with TTL={settings.CACHE_STATS_TTL}s")
+
         metrics.counter("api.requests")
         metrics.histogram("api.request_latency_ms", (_time.time() - _start) * 1000)
-        return {"success": True, "data": stats}
+        return result
     except HTTPException:
         raise
     except Exception as e:

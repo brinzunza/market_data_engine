@@ -50,4 +50,11 @@ class Settings:
     if API_KEY_ENABLED and len(API_KEYS) == 0:
         raise ValueError("API_KEYS is not set in .env")
 
+    # Cache
+    CACHE_ENABLED = os.getenv("CACHE_ENABLED", "true").lower() == "true"
+    CACHE_MAX_SIZE_MB = int(os.getenv("CACHE_MAX_SIZE_MB", 128))
+    CACHE_QUOTE_TTL = int(os.getenv("CACHE_QUOTE_TTL", 2))  # seconds
+    CACHE_STATS_TTL = int(os.getenv("CACHE_STATS_TTL", 30))  # seconds
+    CACHE_TICKERS_TTL = int(os.getenv("CACHE_TICKERS_TTL", 600))  # seconds (10 min)
+
 settings = Settings()

@@ -27,24 +27,26 @@ class RateLimiter:
     def __init__(self):
         self.requests: Dict[str, List[float]] = {}
 
-    def is_allowed(self, client_ip: str) -> tuple[bool, int, int]:
+    def is_allowed(self, identifier: str) -> tuple[bool, int, int]:
+        """Check if request is allowed. Identifier is API key or IP address."""
         if not settings.RATE_LIMIT_ENABLED:
             return True, settings.RATE_LIMIT_REQUESTS, 0
 
         now = time.time()
         window_start = now - settings.RATE_LIMIT_WINDOW
 
-        if client_ip not in self.requests:
-            self.requests[client_ip] = []
+        if identifier not in self.requests:
+            self.requests[identifier] = []
 
-        self.requests[client_ip] = [ts for ts in self.requests[client_ip] if ts > window_start]
+        # Remove old requests outside the window
+        self.requests[identifier] = [ts for ts in self.requests[identifier] if ts > window_start]
 
-        if len(self.requests[client_ip]) >= settings.RATE_LIMIT_REQUESTS:
-            retry_after = int(self.requests[client_ip][0] + settings.RATE_LIMIT_WINDOW - now) + 1
+        if len(self.requests[identifier]) >= settings.RATE_LIMIT_REQUESTS:
+            retry_after = int(self.requests[identifier][0] + settings.RATE_LIMIT_WINDOW - now) + 1
             return False, 0, retry_after
 
-        self.requests[client_ip].append(now)
-        return True, settings.RATE_LIMIT_REQUESTS - len(self.requests[client_ip]), 0
+        self.requests[identifier].append(now)
+        return True, settings.RATE_LIMIT_REQUESTS - len(self.requests[identifier]), 0
 
 
 rate_limiter = RateLimiter()
@@ -56,11 +58,14 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         # Public endpoints that don't require API key
         public_paths = ["/health", "/", "/docs", "/redoc", "/openapi.json", "/ws",
                         "/api/v1/monitor/stats", "/api/v1/monitor/alerts", "/api/v1/monitor/health",
-                        "/monitor"]
+                        "/monitor", "/chart"]
 
-        logger.info(f"APIKeyMiddleware: path={request.url.path}, in public={request.url.path in public_paths}")
+        # Check exact match or prefix match for history endpoint
+        is_public = request.url.path in public_paths or request.url.path.startswith("/api/v1/history/")
 
-        if request.url.path in public_paths:
+        logger.info(f"APIKeyMiddleware: path={request.url.path}, is_public={is_public}")
+
+        if is_public:
             return await call_next(request)
 
         # Check if API key authentication is enabled
@@ -93,28 +98,44 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
                 headers={"WWW-Authenticate": "ApiKey"}
             )
 
+        # Store API key in request state for rate limiting
+        request.state.api_key = api_key
+
         return await call_next(request)
 
 
-class ClientIPMiddleware(BaseHTTPMiddleware):
+class RateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        client_ip = request.client.host if request.client else "unknown"
-        request.state.client_ip = client_ip
-
-        if request.url.path in ["/health", "/ws", "/"]:
+        # Skip rate limiting for public endpoints
+        public_paths = ["/health", "/ws", "/", "/docs", "/redoc", "/openapi.json", "/monitor", "/chart"]
+        is_public = request.url.path in public_paths or request.url.path.startswith("/api/v1/history/")
+        if is_public:
             return await call_next(request)
 
-        is_allowed, remaining, retry_after = rate_limiter.is_allowed(client_ip)
+        # Use API key if available (set by APIKeyMiddleware), otherwise use IP
+        identifier = getattr(request.state, "api_key", None)
+        if not identifier:
+            identifier = f"ip:{request.client.host if request.client else 'unknown'}"
+
+        logger.debug(f"Rate limiting with identifier: {identifier}")
+
+        is_allowed, remaining, retry_after = rate_limiter.is_allowed(identifier)
 
         if not is_allowed:
             return JSONResponse(
                 status_code=429,
-                content={"error": "Rate limit exceeded", "retry_after": retry_after},
+                content={
+                    "error": "Rate limit exceeded",
+                    "message": f"Rate limit of {settings.RATE_LIMIT_REQUESTS} requests per {settings.RATE_LIMIT_WINDOW}s exceeded",
+                    "retry_after": retry_after
+                },
                 headers={"Retry-After": str(retry_after)}
             )
 
         response = await call_next(request)
+        response.headers["X-RateLimit-Limit"] = str(settings.RATE_LIMIT_REQUESTS)
         response.headers["X-RateLimit-Remaining"] = str(remaining)
+        response.headers["X-RateLimit-Window"] = str(settings.RATE_LIMIT_WINDOW)
         return response
 
 
@@ -154,16 +175,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Add API key middleware (must be added before rate limiting)
+# Add rate limit middleware FIRST (executes AFTER APIKeyMiddleware due to reverse order)
+app.add_middleware(RateLimitMiddleware)
+
+# Add API key middleware SECOND (executes FIRST due to reverse order)
 app.add_middleware(APIKeyMiddleware)
 
-# Add client IP middleware (includes rate limiting)
-app.add_middleware(ClientIPMiddleware)
-
 # Include routers
+from .routes.live_chart import router as live_chart_router
 app.include_router(market_data_router)
 app.include_router(monitoring_router)
 app.include_router(dashboard_router)
+app.include_router(live_chart_router)
 
 
 @app.get("/")

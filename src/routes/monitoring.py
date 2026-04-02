@@ -20,6 +20,8 @@ from fastapi import APIRouter, Query
 
 from ..monitoring.collector import metrics
 from ..monitoring.alerts import get_alerts
+from ..cache import get_cache
+from ..config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -141,4 +143,31 @@ async def get_health():
             },
             "recent_alerts": recent_alerts,
         },
+    }
+
+
+# ---------------------------------------------------------------------------
+# /cache  — cache statistics
+# ---------------------------------------------------------------------------
+
+@router.get("/cache")
+async def get_cache_stats():
+    """
+    Return cache statistics including hit rate, size, and eviction metrics.
+    """
+    if not settings.CACHE_ENABLED:
+        return {
+            "success": True,
+            "data": {
+                "enabled": False,
+                "message": "Cache is disabled"
+            }
+        }
+
+    cache = get_cache()
+    stats = cache.get_stats()
+
+    return {
+        "success": True,
+        "data": stats
     }

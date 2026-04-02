@@ -49,8 +49,9 @@ Valid keys are defined in `.env` under `API_KEYS`.
 | GET | `/api/v1/stats/:ticker` | Stats for a period (`period`: 1h/1d/7d/30d) |
 | WS | `/ws` | Real-time tick streaming (see below) |
 | GET | `/monitor` | Live monitoring dashboard |
+| GET | `/chart` | TradingView-style live price chart |
 
-Public endpoints (no key needed): `/`, `/health`, `/docs`, `/monitor`.
+Public endpoints (no key needed): `/`, `/health`, `/docs`, `/monitor`, `/chart`.
 
 ---
 
