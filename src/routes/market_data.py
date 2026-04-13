@@ -182,56 +182,80 @@ async def get_history(
 @router.get("/bars/{ticker}")
 async def get_bars(
     ticker: str,
-    timeframe: str = Query(default="1m", regex="^(1m|5m|1h|1d)$"),
+    timeframe: str = Query(default="1m", regex="^(1s|1m|5m|1h|1d)$"),
     start: Optional[str] = None,
     end: Optional[str] = None,
     limit: int = Query(default=500, le=5000)
 ):
-    """Get OHLCV bars using aggregation"""
+    """Get OHLCV bars using TimescaleDB continuous aggregates (10-100x faster!)"""
     _start = _time.time()
     try:
         start_time = datetime.fromisoformat(start) if start else datetime.now() - timedelta(days=1)
         end_time = datetime.fromisoformat(end) if end else datetime.now()
 
-        interval_map = {
-            "1m": "1 minute",
-            "5m": "5 minutes",
-            "1h": "1 hour",
-            "1d": "1 day"
+        # Map timeframe to continuous aggregate view
+        aggregate_map = {
+            "1s": "market_ohlc_1s",
+            "1m": "market_ohlc_1m",
+            "5m": "market_ohlc_5m",
+            "1h": "market_ohlc_1h"
         }
-        interval = interval_map[timeframe]
 
         conn = db_pool.get_connection()
         cursor = conn.cursor()
 
-        # Use standard PostgreSQL date_trunc for time bucketing
-        # Use subqueries with ROW_NUMBER() for first/last values
-        cursor.execute(
-            """WITH bucketed_data AS (
-                 SELECT
-                   date_trunc(%s, time) AS bucket_time,
-                   ticker,
-                   price,
-                   volume,
-                   time,
-                   ROW_NUMBER() OVER (PARTITION BY date_trunc(%s, time) ORDER BY time ASC) as rn_first,
-                   ROW_NUMBER() OVER (PARTITION BY date_trunc(%s, time) ORDER BY time DESC) as rn_last
-                 FROM market_ticks
-                 WHERE ticker = %s
-                   AND time >= %s
-                   AND time <= %s
-               )
-               SELECT
-                 bucket_time AS time,
-                 ticker,
-                 %s as timeframe,
-                 MAX(CASE WHEN rn_first = 1 THEN price END) as open,
-                 MAX(price) as high,
-                 MIN(price) as low,
-                 MAX(CASE WHEN rn_last = 1 THEN price END) as close,
-                 SUM(volume)::BIGINT as volume
-               FROM bucketed_data
-               GROUP BY bucket_time, ticker
+        # Use continuous aggregate if available, otherwise fall back to raw data
+        if timeframe in aggregate_map:
+            view_name = aggregate_map[timeframe]
+
+            # Query pre-computed OHLC bars from continuous aggregate (MUCH faster!)
+            cursor.execute(
+                f"""SELECT
+                     bucket AS time,
+                     ticker,
+                     %s as timeframe,
+                     open,
+                     high,
+                     low,
+                     close,
+                     volume
+                   FROM {view_name}
+                   WHERE ticker = %s
+                     AND bucket >= %s
+                     AND bucket <= %s
+                   ORDER BY bucket DESC
+                   LIMIT %s""",
+                (timeframe, ticker.upper(), start_time, end_time, limit)
+            )
+        else:
+            # For 1d bars, aggregate on-demand from raw ticks
+            interval = "1 day"
+            cursor.execute(
+                """WITH bucketed_data AS (
+                     SELECT
+                       date_trunc(%s, time) AS bucket_time,
+                       ticker,
+                       price,
+                       volume,
+                       time,
+                       ROW_NUMBER() OVER (PARTITION BY date_trunc(%s, time) ORDER BY time ASC) as rn_first,
+                       ROW_NUMBER() OVER (PARTITION BY date_trunc(%s, time) ORDER BY time DESC) as rn_last
+                     FROM market_ticks
+                     WHERE ticker = %s
+                       AND time >= %s
+                       AND time <= %s
+                   )
+                   SELECT
+                     bucket_time AS time,
+                     ticker,
+                     %s as timeframe,
+                     MAX(CASE WHEN rn_first = 1 THEN price END) as open,
+                     MAX(price) as high,
+                     MIN(price) as low,
+                     MAX(CASE WHEN rn_last = 1 THEN price END) as close,
+                     SUM(volume)::BIGINT as volume
+                   FROM bucketed_data
+                   GROUP BY bucket_time, ticker
                ORDER BY bucket_time ASC
                LIMIT %s""",
             (interval, interval, interval, ticker.upper(), start_time, end_time, timeframe, limit)

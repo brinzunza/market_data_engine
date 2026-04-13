@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  # PostgreSQL Database
+  # TimescaleDB Database (PostgreSQL with time-series extensions)
   postgres:
-    image: postgres:15-alpine
+    image: timescale/timescaledb:2.14.2-pg15
     container_name: synthetic-postgres
     environment:
       POSTGRES_DB: synthetic_market
